@@ -1,0 +1,12 @@
+[requires]
+libxmlpp/5.4.0
+
+[tool_requires]
+cmake/3.27.9
+
+[generators]
+CMakeDeps
+CMakeToolchain
+
+[layout]
+cmake_layout
