@@ -2,6 +2,8 @@
 
 #define MCC2LM_EXCEPTIONS_HPP
 
+#include <stdexcept>
+
 namespace mcc2lm
 {
     struct DatabaseException : public std::runtime_error

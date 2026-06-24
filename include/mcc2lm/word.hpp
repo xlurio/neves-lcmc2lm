@@ -272,6 +272,7 @@ namespace mcc2lm
             }
 
             throw DatabaseException("[WordIterator::operator*] Failed to parse word node");
+            return Word::MakeFromRawStrAndPosTag("", "x");
         }
 
         bool operator!=(const WordIterator &rhs) const

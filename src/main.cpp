@@ -10,6 +10,7 @@
 
 #include <sqlite3.h>
 
+#include <mcc2lm/constants.hpp>
 #include <mcc2lm/exceptions.hpp>
 #include <mcc2lm/sentence.hpp>
 
@@ -43,25 +44,6 @@ const std::string CREATE_WORD_SENTENCE_MAP_TABLE_QUERY =
     "FOREIGN KEY(SENTENCE_ID) REFERENCES MCC2LM_SENTENCE(ID),"
     "FOREIGN KEY(WORD_ID) REFERENCES MCC2LM_WORD(ID));";
 // ---
-
-const std::string LCMC_BASEDIR = "assets//data/character";
-
-const std::array<std::string, 15> LCMC_FILENAMES = {
-    "LCMC_A.XML",
-    "LCMC_B.XML",
-    "LCMC_C.XML",
-    "LCMC_D.XML",
-    "LCMC_E.XML",
-    "LCMC_F.XML",
-    "LCMC_G.XML",
-    "LCMC_H.XML",
-    "LCMC_J.XML",
-    "LCMC_K.XML",
-    "LCMC_L.XML",
-    "LCMC_M.XML",
-    "LCMC_N.XML",
-    "LCMC_P.XML",
-    "LCMC_R.XML"};
 
 namespace
 {
@@ -155,9 +137,9 @@ namespace
         std::mutex exception_mutex;
         std::exception_ptr first_worker_exception;
         std::vector<std::thread> workers;
-        workers.reserve(LCMC_FILENAMES.size());
+        workers.reserve(mcc2lm::LCMC_FILENAMES.size());
 
-        for (std::size_t file_idx = 0; file_idx < LCMC_FILENAMES.size(); ++file_idx)
+        for (std::size_t file_idx = 0; file_idx < mcc2lm::LCMC_FILENAMES.size(); ++file_idx)
         {
             workers.emplace_back(process_file_worker, file_idx, std::ref(first_worker_exception), std::ref(exception_mutex));
         }

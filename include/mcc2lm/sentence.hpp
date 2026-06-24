@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <mcc2lm/word.hpp>
+#include <mcc2lm/constants.hpp>
 #include <algorithm>
 
 namespace mcc2lm
@@ -139,6 +140,7 @@ namespace mcc2lm
             if (!parser->get_document() || !parser->get_document()->get_root_node())
             {
                 throw DatabaseException("[SentenceIterator] Failed to parse sentence XML");
+                return;
             }
 
             curr_node_set = parser->get_document()->get_root_node()->find("//s");
@@ -226,6 +228,7 @@ namespace mcc2lm
             }
 
             throw DatabaseException("[SentenceIterator::operator*] Sentence without words");
+            return Sentence("", {});
         }
 
         bool operator!=(const SentenceIterator &rhs) const

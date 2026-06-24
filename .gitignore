@@ -67,5 +67,6 @@ vcpkg_installed/
 Testing/
 .cache/
 
-# Asserts
+# Artefacts
 assets/
+*.db
