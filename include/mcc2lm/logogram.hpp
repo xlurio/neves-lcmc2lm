@@ -24,7 +24,7 @@ namespace mcc2lm
     public:
         Logogram(std::string value) : value(value) {
             Logger logger("Logogram(" + value + ")");
-            logger.Info("`Logogram` initialized");
+            logger.Debug("`Logogram` initialized");
         }
 
         const std::string &get_id() const
@@ -58,7 +58,7 @@ namespace mcc2lm
                         "[Logogram::Save] Failed to persist value");
                 });
 
-            logger.Info("Saved");
+            logger.Debug("Saved");
         }
     };
 

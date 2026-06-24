@@ -60,7 +60,7 @@ namespace mcc2lm
 
             hash = hash_from_unordered_words();
 
-            logger.Info("`Sentence` initialized");
+            logger.Debug("`Sentence` initialized");
         }
 
         int get_hash() const
@@ -114,7 +114,7 @@ namespace mcc2lm
                     "[Sentence::Save] sentence-word map mutation");
             }
 
-            logger.Info("Saved");
+            logger.Debug("Saved");
         }
     };
 
@@ -152,7 +152,7 @@ namespace mcc2lm
 
             curr_node_set = parser->get_document()->get_root_node()->find("//s");
 
-            logger.Info("`SentenceIterator` initialized");
+            logger.Debug("`SentenceIterator` initialized");
         }
 
         int8_t get_file_idx() const
@@ -191,7 +191,9 @@ namespace mcc2lm
         {
             Logger logger("SentenceIterator(" + LCMC_FILENAMES.at(file_idx) + ")::operator*");
 
-            logger.Debug("Instantiating `Sequence` for index {}", node_set_idx);
+            if (node_set_idx % 50 == 0 || node_set_idx == curr_node_set.size() - 1)
+                logger.Info("Instantiating `Sequence` for index {}/{}",
+                            node_set_idx, curr_node_set.size() - 1);
 
             xmlpp::Node *sentence_node = curr_node_set.at(node_set_idx);
             WordIterator iterator(sentence_node->find(".//w"), 0);
@@ -214,7 +216,8 @@ namespace mcc2lm
                 return Sentence(sentence_value, word_seq);
             }
 
-            logger.Debug("Skipping sentence without words at node index {}", node_set_idx);
+            logger.Debug("Skipping sentence without words at node index {}/{}",
+                         node_set_idx, curr_node_set.size() - 1);
             return Sentence("", {});
         }
 

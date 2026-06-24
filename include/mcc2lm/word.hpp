@@ -140,7 +140,7 @@ namespace mcc2lm
             pos_tag = PosTagFromRaw(raw_pos_tag);
             hash = hash_from_value();
 
-            logger.Info("`Word` initialized");
+            logger.Debug("`Word` initialized");
         }
 
         int get_hash() const
@@ -232,7 +232,7 @@ namespace mcc2lm
                     "[Word::Save] logogram-word map mutation");
             }
 
-            logger.Info("Saving");
+            logger.Debug("Saved");
         }
 
         const std::string &get_value() const

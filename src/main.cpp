@@ -1,6 +1,6 @@
 #include <mcc2lm/constants.hpp>
 
-#define MCC2LM_LOG_LEVEL mcc2lm::LogLevel::DEBUG
+#define MCC2LM_LOG_LEVEL mcc2lm::LogLevel::INFO
 
 #include <array>
 #include <cstdint>
