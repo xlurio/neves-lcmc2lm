@@ -17,16 +17,18 @@ namespace mcc2lm
         const std::string GET_SENTENCE_BY_ID_QUERY = "SELECT ID "
                                                      "FROM MCC2LM_SENTENCE "
                                                      "WHERE ID = ?;";
-        const std::string INSERT_SENTENCE_QUERY = "INSERT INTO MCC2LM_SENTENCE "
-                               "VALUES (?, ?);";
+        const std::string INSERT_SENTENCE_QUERY =
+            "INSERT OR IGNORE INTO MCC2LM_SENTENCE "
+            "VALUES (?, ?);";
 
         // MCC2LM_WORD_SENTENCE_MAP
-        const std::string GET_WORD_SENTENCE_MAP_BY_ID_QUERY = "SELECT ID "
-                                                              "FROM MCC2LM_WORD_SENTENCE_MAP "
-                                                              "WHERE SENTENCE_ID = ? "
-                                                              "AND WORD_ID = ?;";
+        const std::string GET_WORD_SENTENCE_MAP_BY_ID_QUERY =
+            "SELECT ID "
+            "FROM MCC2LM_WORD_SENTENCE_MAP "
+            "WHERE SENTENCE_ID = ? "
+            "AND WORD_ID = ?;";
         const std::string INSERT_WORD_SENTENCE_MAP_QUERY =
-            "INSERT INTO MCC2LM_WORD_SENTENCE_MAP (SENTENCE_ID, WORD_ID)"
+            "INSERT OR IGNORE INTO MCC2LM_WORD_SENTENCE_MAP (SENTENCE_ID, WORD_ID)"
             "VALUES (?, ?);";
 
         // ---

@@ -142,6 +142,47 @@ namespace mcc2lm
 
         execute_non_query(db, insert_query, bind_keys, context + " [insert]");
     }
+
+    template <typename Func>
+    void run_in_immediate_transaction(sqlite3 *db, const std::string &context, Func &&body)
+    {
+        if (sqlite3_get_autocommit(db) == 0)
+        {
+            throw DatabaseException(context + " [begin]: transaction already active");
+        }
+
+        if (sqlite3_exec(db, "BEGIN IMMEDIATE;", nullptr, nullptr, nullptr) != SQLITE_OK)
+        {
+            throw_sqlite_error(db, context + " [begin] Failed to start immediate transaction");
+        }
+
+        try
+        {
+            body();
+        }
+        catch (...)
+        {
+            if (sqlite3_get_autocommit(db) == 0)
+            {
+                if (sqlite3_exec(db, "ROLLBACK;", nullptr, nullptr, nullptr) != SQLITE_OK)
+                {
+                    throw_sqlite_error(db, context + " [rollback] Failed to rollback immediate transaction");
+                }
+            }
+
+            throw;
+        }
+
+        if (sqlite3_exec(db, "COMMIT;", nullptr, nullptr, nullptr) != SQLITE_OK)
+        {
+            if (sqlite3_get_autocommit(db) == 0)
+            {
+                (void)sqlite3_exec(db, "ROLLBACK;", nullptr, nullptr, nullptr);
+            }
+
+            throw_sqlite_error(db, context + " [commit] Failed to commit immediate transaction");
+        }
+    }
 }
 
 #endif

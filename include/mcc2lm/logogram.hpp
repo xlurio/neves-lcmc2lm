@@ -47,27 +47,31 @@ namespace mcc2lm
                 return;
             }
 
-            const bool already_exists = row_exists(
+            run_in_immediate_transaction(
                 db,
-                GET_LOGOGRAM_BY_ID_QUERY,
-                [this, db](sqlite3_stmt *stmt)
+                "[Logogram::Save] immediate upsert",
+                [this, db]()
                 {
-                    bind_text(db, stmt, 1, value, "[Logogram::Save] Failed to bind value ID");
-                },
-                "[Logogram::Save] Failed to select value");
+                    const bool already_exists = row_exists(
+                        db,
+                        GET_LOGOGRAM_BY_ID_QUERY,
+                        [this, db](sqlite3_stmt *stmt)
+                        {
+                            bind_text(db, stmt, 1, value, "[Logogram::Save] Failed to bind value ID");
+                        },
+                        "[Logogram::Save] Failed to select value");
 
-            sqlite3_stmt *mutation_stmt = nullptr;
-            const std::string &query = already_exists ? UPDATE_LOGOGRAM_QUERY : INSERT_LOGOGRAM_QUERY;
-            (void)mutation_stmt;
+                    const std::string &query = already_exists ? UPDATE_LOGOGRAM_QUERY : INSERT_LOGOGRAM_QUERY;
 
-            execute_non_query(
-                db,
-                query,
-                [this, db](sqlite3_stmt *stmt)
-                {
-                    bind_text(db, stmt, 1, value, "[Logogram::Save] Failed to bind value mutation ID");
-                },
-                "[Logogram::Save] Failed to persist value");
+                    execute_non_query(
+                        db,
+                        query,
+                        [this, db](sqlite3_stmt *stmt)
+                        {
+                            bind_text(db, stmt, 1, value, "[Logogram::Save] Failed to bind value mutation ID");
+                        },
+                        "[Logogram::Save] Failed to persist value");
+                });
 
             logger.Info("Saved");
         }

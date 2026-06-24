@@ -47,7 +47,7 @@ namespace mcc2lm
                                                               "WHERE WORD_ID = ? "
                                                               "AND LOGOGRAM_ID = ?;";
         const std::string INSERT_LOGOGRAM_WORD_MAP_QUERY =
-            "INSERT INTO MCC2LM_LOGOGRAM_WORD_MAP (WORD_ID, LOGOGRAM_ID)"
+            "INSERT OR IGNORE INTO MCC2LM_LOGOGRAM_WORD_MAP (WORD_ID, LOGOGRAM_ID)"
             "VALUES (?, ?);";
 
         // ---
@@ -153,46 +153,52 @@ namespace mcc2lm
                 return;
             }
 
-            const std::pair<bool, std::string> existing_word = optional_text_value(
+            run_in_immediate_transaction(
                 db,
-                GET_WORD_BY_ID_QUERY,
-                [this, db](sqlite3_stmt *stmt)
+                "[Word::Save] immediate upsert",
+                [this, db]()
                 {
-                    bind_int(db, stmt, 1, hash, "[Word::Save] Failed to bind word ID");
-                },
-                0,
-                "[Word::Save] Failed to select word");
+                    const std::pair<bool, std::string> existing_word = optional_text_value(
+                        db,
+                        GET_WORD_BY_ID_QUERY,
+                        [this, db](sqlite3_stmt *stmt)
+                        {
+                            bind_int(db, stmt, 1, hash, "[Word::Save] Failed to bind word ID");
+                        },
+                        0,
+                        "[Word::Save] Failed to select word");
 
-            const bool already_exists = existing_word.first;
-            const std::string &existing_value = existing_word.second;
-            if (already_exists && existing_value != value)
-            {
-                throw ParserException("[Word::Save] Hash collision for word ID " + std::to_string(hash));
-            }
+                    const bool already_exists = existing_word.first;
+                    const std::string &existing_value = existing_word.second;
+                    if (already_exists && existing_value != value)
+                    {
+                        throw ParserException("[Word::Save] Hash collision for word ID " + std::to_string(hash));
+                    }
 
-            if (already_exists)
-            {
-                execute_non_query(
-                    db,
-                    UPDATE_WORD_QUERY,
-                    [this, db](sqlite3_stmt *stmt)
+                    if (already_exists)
                     {
-                        bind_int(db, stmt, 1, hash, "[Word::Save] Failed to bind word mutation ID");
-                    },
-                    "[Word::Save] Failed to persist word");
-            }
-            else
-            {
-                execute_non_query(
-                    db,
-                    INSERT_WORD_QUERY,
-                    [this, db](sqlite3_stmt *stmt)
+                        execute_non_query(
+                            db,
+                            UPDATE_WORD_QUERY,
+                            [this, db](sqlite3_stmt *stmt)
+                            {
+                                bind_int(db, stmt, 1, hash, "[Word::Save] Failed to bind word mutation ID");
+                            },
+                            "[Word::Save] Failed to persist word");
+                    }
+                    else
                     {
-                        bind_int(db, stmt, 1, hash, "[Word::Save] Failed to bind word mutation ID");
-                        bind_text(db, stmt, 2, value, "[Word::Save] Failed to bind word value");
-                    },
-                    "[Word::Save] Failed to persist word");
-            }
+                        execute_non_query(
+                            db,
+                            INSERT_WORD_QUERY,
+                            [this, db](sqlite3_stmt *stmt)
+                            {
+                                bind_int(db, stmt, 1, hash, "[Word::Save] Failed to bind word mutation ID");
+                                bind_text(db, stmt, 2, value, "[Word::Save] Failed to bind word value");
+                            },
+                            "[Word::Save] Failed to persist word");
+                    }
+                });
 
             for (mcc2lm::Logogram &logogram : logograms)
             {
