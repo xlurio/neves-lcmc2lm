@@ -10,20 +10,42 @@
 
 namespace mcc2lm
 {
+    struct CharacterMetadata
+    {
+        std::string pinyin;
+        std::string meaning;
+    };
+
     std::vector<std::string> get_radicals_from_logogram(std::string logogram_value);
+    CharacterMetadata get_unihan_metadata(const std::string &logogram_value);
 
     class Radical
     {
         // MCC2LM_RADICAL
         const std::string INSERT_RADICAL_QUERY =
-            "INSERT OR IGNORE INTO MCC2LM_RADICAL "
-            "(ID) VALUES (?);";
+            "INSERT INTO MCC2LM_RADICAL "
+            "(ID, PINYIN, MEANING) VALUES (?, ?, ?) "
+            "ON CONFLICT(ID) DO UPDATE SET "
+            "PINYIN = CASE "
+            "WHEN (MCC2LM_RADICAL.PINYIN IS NULL OR MCC2LM_RADICAL.PINYIN = '') "
+            "AND excluded.PINYIN IS NOT NULL AND excluded.PINYIN <> '' "
+            "THEN excluded.PINYIN ELSE MCC2LM_RADICAL.PINYIN END, "
+            "MEANING = CASE "
+            "WHEN (MCC2LM_RADICAL.MEANING IS NULL OR MCC2LM_RADICAL.MEANING = '') "
+            "AND excluded.MEANING IS NOT NULL AND excluded.MEANING <> '' "
+            "THEN excluded.MEANING ELSE MCC2LM_RADICAL.MEANING END;";
         // ---
 
         std::string value;
+        std::string pinyin;
+        std::string meaning;
 
     public:
-        Radical(std::string value) : value(value) {}
+        Radical(std::string value,
+                std::string pinyin = "",
+                std::string meaning = "") : value(value),
+                                            pinyin(pinyin),
+                                            meaning(meaning) {}
 
         std::string get_value() const {
             return value;
@@ -51,6 +73,18 @@ namespace mcc2lm
                         1,
                         value,
                         "[Radical::Save] Failed to bind radical value");
+                    bind_text(
+                        db,
+                        stmt,
+                        2,
+                        pinyin,
+                        "[Radical::Save] Failed to bind radical pinyin");
+                    bind_text(
+                        db,
+                        stmt,
+                        3,
+                        meaning,
+                        "[Radical::Save] Failed to bind radical meaning");
                 },
                 "[Radical::Save] Failed to insert radical");
 
@@ -96,7 +130,9 @@ namespace mcc2lm
 
         Radical operator*() const
         {
-            return Radical(raw_radicals.at(curr_idx));
+            const std::string radical_value = raw_radicals.at(curr_idx);
+            const CharacterMetadata metadata = get_unihan_metadata(radical_value);
+            return Radical(radical_value, metadata.pinyin, metadata.meaning);
         }
 
         bool operator!=(const RadicalIterator &rhs) const

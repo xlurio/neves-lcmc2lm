@@ -16,6 +16,8 @@ namespace mcc2lm
     namespace
     {
         using RadicalIndex = std::unordered_map<std::string, std::vector<std::string>>;
+        using MetadataAccumulator = std::unordered_map<std::string, std::vector<std::string>>;
+        using MetadataIndex = std::unordered_map<std::string, CharacterMetadata>;
 
         bool starts_with(const std::string &value, const std::string &prefix)
         {
@@ -148,6 +150,23 @@ namespace mcc2lm
             return true;
         }
 
+        std::string join_values(const std::vector<std::string> &values)
+        {
+            if (values.empty())
+            {
+                return "";
+            }
+
+            std::string joined = values.front();
+            for (std::size_t idx = 1; idx < values.size(); ++idx)
+            {
+                joined += "; ";
+                joined += values[idx];
+            }
+
+            return joined;
+        }
+
         std::string kangxi_radical_from_number(int radical_number)
         {
             if (radical_number < 1 || radical_number > 214)
@@ -229,6 +248,93 @@ namespace mcc2lm
             logger.Info("Loaded Unihan radical index with {} mapped logograms ({} rows scanned)", mapped_count, row_count);
         }
 
+        void load_unihan_metadata(MetadataIndex &index)
+        {
+            Logger logger("get_unihan_metadata::load_unihan_metadata");
+
+            std::ifstream infile(UNIHAN_READINGS_PATH);
+            if (!infile.is_open())
+            {
+                throw ParserException(
+                    "[get_unihan_metadata] Failed to open Unihan file: " +
+                    UNIHAN_READINGS_PATH);
+            }
+
+            MetadataAccumulator pinyin_values;
+            MetadataAccumulator meaning_values;
+            std::size_t row_count = 0;
+
+            std::string line;
+            while (std::getline(infile, line))
+            {
+                if (line.empty() || starts_with(line, "#"))
+                {
+                    continue;
+                }
+
+                const std::vector<std::string> fields = split_tab_fields(line);
+                if (fields.size() < 3)
+                {
+                    continue;
+                }
+
+                std::uint32_t codepoint = 0;
+                if (!parse_unihan_codepoint(fields[0], codepoint))
+                {
+                    continue;
+                }
+
+                const std::string character = codepoint_to_utf8(codepoint);
+                const std::string &property_name = fields[1];
+                const std::string &property_value = fields[2];
+
+                if (property_value.empty())
+                {
+                    continue;
+                }
+
+                if (property_name == "kMandarin")
+                {
+                    append_unique(pinyin_values[character], property_value);
+                }
+                else if (property_name == "kDefinition")
+                {
+                    append_unique(meaning_values[character], property_value);
+                }
+
+                ++row_count;
+            }
+
+            std::size_t with_pinyin = 0;
+            std::size_t with_meaning = 0;
+
+            for (const auto &entry : pinyin_values)
+            {
+                CharacterMetadata &metadata = index[entry.first];
+                metadata.pinyin = join_values(entry.second);
+                if (!metadata.pinyin.empty())
+                {
+                    ++with_pinyin;
+                }
+            }
+
+            for (const auto &entry : meaning_values)
+            {
+                CharacterMetadata &metadata = index[entry.first];
+                metadata.meaning = join_values(entry.second);
+                if (!metadata.meaning.empty())
+                {
+                    ++with_meaning;
+                }
+            }
+
+            logger.Info(
+                "Loaded Unihan metadata index (rows scanned: {}, pinyin entries: {}, meaning entries: {})",
+                row_count,
+                with_pinyin,
+                with_meaning);
+        }
+
         const RadicalIndex &get_radical_index()
         {
             static RadicalIndex index;
@@ -236,6 +342,17 @@ namespace mcc2lm
 
             std::call_once(loaded, []()
                            { load_unihan_radicals(index); });
+
+            return index;
+        }
+
+        const MetadataIndex &get_metadata_index()
+        {
+            static MetadataIndex index;
+            static std::once_flag loaded;
+
+            std::call_once(loaded, []()
+                           { load_unihan_metadata(index); });
 
             return index;
         }
@@ -257,6 +374,24 @@ namespace mcc2lm
         {
             logger.Debug("No Unihan radical mapping found");
             return {};
+        }
+
+        return it->second;
+    }
+
+    CharacterMetadata get_unihan_metadata(const std::string &logogram_value)
+    {
+        if (logogram_value.empty())
+        {
+            return CharacterMetadata{"", ""};
+        }
+
+        const MetadataIndex &index = get_metadata_index();
+        const MetadataIndex::const_iterator it = index.find(logogram_value);
+
+        if (it == index.end())
+        {
+            return CharacterMetadata{"", ""};
         }
 
         return it->second;

@@ -14,9 +14,18 @@ namespace mcc2lm
     {
         // MCC2LM_LOGOGRAM
         const std::string UPSERT_LOGOGRAM_QUERY =
-            "INSERT INTO MCC2LM_LOGOGRAM (ID, OCCURRENCIES) "
-            "VALUES (?, 1) "
-            "ON CONFLICT(ID) DO UPDATE SET OCCURRENCIES = MCC2LM_LOGOGRAM.OCCURRENCIES + 1;";
+            "INSERT INTO MCC2LM_LOGOGRAM (ID, OCCURRENCIES, PINYIN, MEANING) "
+            "VALUES (?, 1, ?, ?) "
+            "ON CONFLICT(ID) DO UPDATE SET "
+            "OCCURRENCIES = MCC2LM_LOGOGRAM.OCCURRENCIES + 1, "
+            "PINYIN = CASE "
+            "WHEN (MCC2LM_LOGOGRAM.PINYIN IS NULL OR MCC2LM_LOGOGRAM.PINYIN = '') "
+            "AND excluded.PINYIN IS NOT NULL AND excluded.PINYIN <> '' "
+            "THEN excluded.PINYIN ELSE MCC2LM_LOGOGRAM.PINYIN END, "
+            "MEANING = CASE "
+            "WHEN (MCC2LM_LOGOGRAM.MEANING IS NULL OR MCC2LM_LOGOGRAM.MEANING = '') "
+            "AND excluded.MEANING IS NOT NULL AND excluded.MEANING <> '' "
+            "THEN excluded.MEANING ELSE MCC2LM_LOGOGRAM.MEANING END;";
         const std::string INSERT_RADICAL_LOGOGRAM_MAP_QUERY =
             "INSERT OR IGNORE INTO MCC2LM_RADICAL_LOGOGRAM_MAP "
             "(LOGOGRAM_ID, RADICAL_ID) VALUES (?, ?);";
@@ -24,11 +33,18 @@ namespace mcc2lm
         // ---
 
         std::string value;
+        std::string pinyin;
+        std::string meaning;
 
     public:
         Logogram(std::string value) : value(value)
         {
             Logger logger("Logogram(" + value + ")");
+
+            const CharacterMetadata metadata = get_unihan_metadata(value);
+            pinyin = metadata.pinyin;
+            meaning = metadata.meaning;
+
             logger.Debug("`Logogram` initialized");
         }
 
@@ -59,6 +75,18 @@ namespace mcc2lm
                         1,
                         value,
                         "[Logogram::Save] Failed to bind value mutation ID");
+                    bind_text(
+                        db,
+                        stmt,
+                        2,
+                        pinyin,
+                        "[Logogram::Save] Failed to bind value pinyin");
+                    bind_text(
+                        db,
+                        stmt,
+                        3,
+                        meaning,
+                        "[Logogram::Save] Failed to bind value meaning");
                 },
                 "[Logogram::Save] Failed to persist value");
 

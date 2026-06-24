@@ -19,11 +19,15 @@
 // CREATE TABLE
 const std::string CREATE_RADICAL_TABLE_QUERY =
     "CREATE TABLE IF NOT EXISTS MCC2LM_RADICAL("
-    "ID VARCHAR(4) PRIMARY KEY);";
+    "ID VARCHAR(4) PRIMARY KEY,"
+    "PINYIN TEXT,"
+    "MEANING TEXT);";
 const std::string CREATE_LOGOGRAM_TABLE_QUERY =
     "CREATE TABLE IF NOT EXISTS MCC2LM_LOGOGRAM("
     "ID VARCHAR(4) PRIMARY KEY,"
-    "OCCURRENCIES INTEGER);";
+    "OCCURRENCIES INTEGER,"
+    "PINYIN TEXT,"
+    "MEANING TEXT);";
 const std::string CREATE_RADICAL_LOGOGRAM_MAP_TABLE_QUERY =
     "CREATE TABLE IF NOT EXISTS MCC2LM_RADICAL_LOGOGRAM_MAP("
     "ID INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -121,6 +125,37 @@ namespace
                 + CREATE_SENTENCE_TABLE_QUERY             //
                 + CREATE_WORD_SENTENCE_MAP_TABLE_QUERY,
             "[main] Failed to create database schema");
+
+        const auto has_column = [db = connection.get()](const std::string &table_name, const std::string &column_name)
+        {
+            return mcc2lm::row_exists(
+                db,
+                "SELECT 1 FROM pragma_table_info('" + table_name + "') WHERE name = ? LIMIT 1;",
+                [&column_name, db](sqlite3_stmt *stmt)
+                {
+                    mcc2lm::bind_text(db, stmt, 1, column_name, "[main] Failed to bind schema column name");
+                },
+                "[main] Failed to inspect schema columns");
+        };
+
+        const auto ensure_column = [db = connection.get(), &has_column](const std::string &table_name, const std::string &column_definition)
+        {
+            const std::string column_name = column_definition.substr(0, column_definition.find(' '));
+            if (column_name.empty() || has_column(table_name, column_name))
+            {
+                return;
+            }
+
+            mcc2lm::execute_sqlite_exec(
+                db,
+                "ALTER TABLE " + table_name + " ADD COLUMN " + column_definition + ";",
+                "[main] Failed to migrate schema");
+        };
+
+        ensure_column("MCC2LM_RADICAL", "PINYIN TEXT");
+        ensure_column("MCC2LM_RADICAL", "MEANING TEXT");
+        ensure_column("MCC2LM_LOGOGRAM", "PINYIN TEXT");
+        ensure_column("MCC2LM_LOGOGRAM", "MEANING TEXT");
     }
 
     void process_file_worker(std::size_t file_idx, std::exception_ptr &first_worker_exception, std::mutex &exception_mutex)
