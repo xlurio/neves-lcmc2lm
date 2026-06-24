@@ -5,6 +5,7 @@
 #include <string>
 #include <mcc2lm/sql.hpp>
 #include <cstdint>
+#include <mcc2lm/logger.hpp>
 
 namespace mcc2lm
 {
@@ -22,19 +23,26 @@ namespace mcc2lm
 
         // ---
 
-        std::string logogram;
+        std::string value;
 
     public:
-        Logogram(std::string logogram) : logogram(logogram) {}
+        Logogram(std::string value) : value(value) {
+            Logger logger("Logogram(" + value + ")");
+            logger.Info("`Logogram` initialized");
+        }
 
         const std::string &get_id() const
         {
-            return logogram;
+            return value;
         }
 
-        void save(sqlite3 *db)
+        void Save(sqlite3 *db)
         {
-            if (logogram.empty())
+            Logger logger("Logogram('" + value + "')::Save");
+
+            logger.Debug("Saving");
+
+            if (value.empty())
             {
                 return;
             }
@@ -44,9 +52,9 @@ namespace mcc2lm
                 GET_LOGOGRAM_BY_ID_QUERY,
                 [this, db](sqlite3_stmt *stmt)
                 {
-                    bind_text(db, stmt, 1, logogram, "[Logogram::save] Failed to bind logogram ID");
+                    bind_text(db, stmt, 1, value, "[Logogram::Save] Failed to bind value ID");
                 },
-                "[Logogram::save] Failed to select logogram");
+                "[Logogram::Save] Failed to select value");
 
             sqlite3_stmt *mutation_stmt = nullptr;
             const std::string &query = already_exists ? UPDATE_LOGOGRAM_QUERY : INSERT_LOGOGRAM_QUERY;
@@ -57,9 +65,11 @@ namespace mcc2lm
                 query,
                 [this, db](sqlite3_stmt *stmt)
                 {
-                    bind_text(db, stmt, 1, logogram, "[Logogram::save] Failed to bind logogram mutation ID");
+                    bind_text(db, stmt, 1, value, "[Logogram::Save] Failed to bind value mutation ID");
                 },
-                "[Logogram::save] Failed to persist logogram");
+                "[Logogram::Save] Failed to persist value");
+
+            logger.Info("Saved");
         }
     };
 
@@ -77,42 +87,80 @@ namespace mcc2lm
             return curr_idx;
         }
 
-        LogogramIterator begin()
+        LogogramIterator begin() const
         {
             return LogogramIterator(raw_str, 0);
         }
 
-        LogogramIterator end()
+        LogogramIterator end() const
         {
             return LogogramIterator(raw_str, raw_str.size());
         }
 
         int get_char_size() const
         {
-            char first_char = raw_str.at(curr_idx);
-
-            int8_t curr_bit = 0;
-            int char_size = 0;
-            uint8_t shift_offset = 7;
-
-            do
+            if (curr_idx < 0 || curr_idx >= static_cast<int>(raw_str.size()))
             {
-                curr_bit = first_char >> shift_offset;
-                char_size++;
-                shift_offset--;
-            } while (curr_bit != 0);
+                return 0;
+            }
 
-            return char_size;
+            const unsigned char first_char = static_cast<unsigned char>(raw_str.at(curr_idx));
+
+            if ((first_char & 0x80U) == 0)
+            {
+                return 1;
+            }
+
+            if ((first_char & 0xE0U) == 0xC0U)
+            {
+                return 2;
+            }
+
+            if ((first_char & 0xF0U) == 0xE0U)
+            {
+                return 3;
+            }
+
+            if ((first_char & 0xF8U) == 0xF0U)
+            {
+                return 4;
+            }
+
+            // Invalid leading byte. Consume one byte to avoid livelock.
+            return 1;
         }
 
-        LogogramIterator operator++() const
+        LogogramIterator &operator++()
         {
-            return LogogramIterator(raw_str, curr_idx + get_char_size());
+            const int char_size = get_char_size();
+            if (char_size <= 0)
+            {
+                curr_idx = static_cast<int>(raw_str.size());
+                return *this;
+            }
+
+            const int capped_next_idx = curr_idx + char_size;
+            const int max_idx = static_cast<int>(raw_str.size());
+            curr_idx = capped_next_idx > max_idx ? max_idx : capped_next_idx;
+            return *this;
         }
 
         Logogram operator*() const
         {
-            return Logogram(raw_str.substr(curr_idx, get_char_size()));
+            const int char_size = get_char_size();
+            if (char_size <= 0)
+            {
+                return Logogram("");
+            }
+
+            int safe_char_size = char_size;
+            const int remaining_size = static_cast<int>(raw_str.size()) - curr_idx;
+            if (safe_char_size > remaining_size)
+            {
+                safe_char_size = remaining_size;
+            }
+
+            return Logogram(raw_str.substr(curr_idx, safe_char_size));
         }
 
         bool operator!=(const LogogramIterator &rhs) const

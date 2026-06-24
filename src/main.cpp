@@ -1,3 +1,7 @@
+#include <mcc2lm/constants.hpp>
+
+#define MCC2LM_LOG_LEVEL mcc2lm::LogLevel::DEBUG
+
 #include <array>
 #include <cstdint>
 #include <cstdlib>
@@ -7,11 +11,9 @@
 #include <string>
 #include <thread>
 #include <vector>
-
 #include <sqlite3.h>
-
-#include <mcc2lm/constants.hpp>
 #include <mcc2lm/exceptions.hpp>
+#include <mcc2lm/logger.hpp>
 #include <mcc2lm/sentence.hpp>
 
 // CREATE TABLE
@@ -104,6 +106,8 @@ namespace
     {
         try
         {
+            mcc2lm::Logger logger("process_file_worker(" + mcc2lm::LCMC_FILENAMES.at(file_idx) + ")");
+
             ScopedSqliteConnection thread_connection("mcc2lm.db", "[worker] Failed to open database");
 
             if (sqlite3_exec(thread_connection.get(), "PRAGMA foreign_keys = ON;", nullptr, nullptr, nullptr) != SQLITE_OK)
@@ -116,11 +120,15 @@ namespace
                 throw mcc2lm::DatabaseException("[worker] Failed to configure busy timeout");
             }
 
+            logger.Debug("Processing LCMC file");
+
             mcc2lm::SentenceIterator iterator(static_cast<int8_t>(file_idx), 0);
             for (mcc2lm::Sentence sentence : iterator)
             {
-                sentence.save(thread_connection.get());
+                sentence.Save(thread_connection.get());
             }
+
+            logger.Debug("LCMC file processed");
         }
         catch (...)
         {

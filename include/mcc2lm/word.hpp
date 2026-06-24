@@ -6,6 +6,7 @@
 #include <vector>
 #include <mcc2lm/logogram.hpp>
 #include <mcc2lm/exceptions.hpp>
+#include <mcc2lm/logger.hpp>
 #include <libxml++/libxml++.h>
 #include <climits>
 
@@ -126,8 +127,14 @@ namespace mcc2lm
              std::string raw_pos_tag) : logograms(logograms),
                                         value(value)
         {
+            Logger logger("Word(" + value + ")");
+
+            logger.Debug("Initializing `Word`");
+
             pos_tag = PosTagFromRaw(raw_pos_tag);
             hash = hash_from_value();
+
+            logger.Info("`Word` initialized");
         }
 
         int get_hash() const
@@ -135,8 +142,12 @@ namespace mcc2lm
             return hash;
         }
 
-        void save(sqlite3 *db)
+        void Save(sqlite3 *db)
         {
+            Logger logger("Word('" + value + "')::Save");
+
+            logger.Debug("Saving");
+
             if (value.empty() || pos_tag == WordPosTag::IGNORE)
             {
                 return;
@@ -147,16 +158,16 @@ namespace mcc2lm
                 GET_WORD_BY_ID_QUERY,
                 [this, db](sqlite3_stmt *stmt)
                 {
-                    bind_int(db, stmt, 1, hash, "[Word::save] Failed to bind word ID");
+                    bind_int(db, stmt, 1, hash, "[Word::Save] Failed to bind word ID");
                 },
                 0,
-                "[Word::save] Failed to select word");
+                "[Word::Save] Failed to select word");
 
             const bool already_exists = existing_word.first;
             const std::string &existing_value = existing_word.second;
             if (already_exists && existing_value != value)
             {
-                throw DatabaseException("[Word::save] Hash collision for word ID " + std::to_string(hash));
+                throw ParserException("[Word::Save] Hash collision for word ID " + std::to_string(hash));
             }
 
             if (already_exists)
@@ -166,9 +177,9 @@ namespace mcc2lm
                     UPDATE_WORD_QUERY,
                     [this, db](sqlite3_stmt *stmt)
                     {
-                        bind_int(db, stmt, 1, hash, "[Word::save] Failed to bind word mutation ID");
+                        bind_int(db, stmt, 1, hash, "[Word::Save] Failed to bind word mutation ID");
                     },
-                    "[Word::save] Failed to persist word");
+                    "[Word::Save] Failed to persist word");
             }
             else
             {
@@ -177,15 +188,15 @@ namespace mcc2lm
                     INSERT_WORD_QUERY,
                     [this, db](sqlite3_stmt *stmt)
                     {
-                        bind_int(db, stmt, 1, hash, "[Word::save] Failed to bind word mutation ID");
-                        bind_text(db, stmt, 2, value, "[Word::save] Failed to bind word value");
+                        bind_int(db, stmt, 1, hash, "[Word::Save] Failed to bind word mutation ID");
+                        bind_text(db, stmt, 2, value, "[Word::Save] Failed to bind word value");
                     },
-                    "[Word::save] Failed to persist word");
+                    "[Word::Save] Failed to persist word");
             }
 
             for (mcc2lm::Logogram &logogram : logograms)
             {
-                logogram.save(db);
+                logogram.Save(db);
 
                 ensure_mapping_row(
                     db,
@@ -193,11 +204,13 @@ namespace mcc2lm
                     INSERT_LOGOGRAM_WORD_MAP_QUERY,
                     [this, &logogram, db](sqlite3_stmt *stmt)
                     {
-                        bind_int(db, stmt, 1, hash, "[Word::save] Failed to bind logogram-word map word ID");
-                        bind_text(db, stmt, 2, logogram.get_id(), "[Word::save] Failed to bind logogram-word map logogram ID");
+                        bind_int(db, stmt, 1, hash, "[Word::Save] Failed to bind logogram-word map word ID");
+                        bind_text(db, stmt, 2, logogram.get_id(), "[Word::Save] Failed to bind logogram-word map logogram ID");
                     },
-                    "[Word::save] logogram-word map mutation");
+                    "[Word::Save] logogram-word map mutation");
             }
+
+            logger.Info("Saving");
         }
 
         const std::string &get_value() const
@@ -239,19 +252,20 @@ namespace mcc2lm
             return curr_idx;
         }
 
-        WordIterator begin()
+        WordIterator begin() const
         {
             return WordIterator(word_node_set, 0);
         }
 
-        WordIterator end()
+        WordIterator end() const
         {
             return WordIterator(word_node_set, word_node_set.size());
         }
 
-        WordIterator operator++() const
+        WordIterator &operator++()
         {
-            return WordIterator(word_node_set, curr_idx + 1);
+            curr_idx++;
+            return *this;
         }
 
         Word operator*() const
@@ -271,7 +285,7 @@ namespace mcc2lm
                 }
             }
 
-            throw DatabaseException("[WordIterator::operator*] Failed to parse word node");
+            throw ParserException("[WordIterator::operator*] Failed to parse word node");
             return Word::MakeFromRawStrAndPosTag("", "x");
         }
 

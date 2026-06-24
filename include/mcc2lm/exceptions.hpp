@@ -10,6 +10,16 @@ namespace mcc2lm
     {
         using std::runtime_error::runtime_error;
     };
+
+    struct ParserException : public std::runtime_error
+    {
+        using std::runtime_error::runtime_error;
+    };
+
+    struct AssertionError : public std::runtime_error
+    {
+        using std::runtime_error::runtime_error;
+    };
 }
 
 #endif

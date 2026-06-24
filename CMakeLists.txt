@@ -1,8 +1,8 @@
-project(neves-lcmc2lm)
-
 cmake_minimum_required(VERSION 3.31)
 
-set(CMAKE_CXX_STANDARD 17)
+project(neves-lcmc2lm)
+
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(libxmlpp REQUIRED)

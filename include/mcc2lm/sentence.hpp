@@ -7,6 +7,7 @@
 #include <mcc2lm/word.hpp>
 #include <mcc2lm/constants.hpp>
 #include <algorithm>
+#include <mcc2lm/logger.hpp>
 
 namespace mcc2lm
 {
@@ -16,8 +17,8 @@ namespace mcc2lm
         const std::string GET_SENTENCE_BY_ID_QUERY = "SELECT ID "
                                                      "FROM MCC2LM_SENTENCE "
                                                      "WHERE ID = ?;";
-        const std::string INSERT_SENTENCE_QUERY = "INSERT INTO MCC2LM_SENTENCE"
-                                                  "VALUES (?, ?);";
+        const std::string INSERT_SENTENCE_QUERY = "INSERT INTO MCC2LM_SENTENCE "
+                               "VALUES (?, ?);";
 
         // MCC2LM_WORD_SENTENCE_MAP
         const std::string GET_WORD_SENTENCE_MAP_BY_ID_QUERY = "SELECT ID "
@@ -61,7 +62,11 @@ namespace mcc2lm
         Sentence(std::string value, std::vector<Word> words) : value(value),
                                                                words(words)
         {
+            Logger logger("Sentence('" + value + "')");
+
             hash = hash_from_unordered_words();
+
+            logger.Info("`Sentence` initialized");
         }
 
         int get_hash() const
@@ -69,8 +74,12 @@ namespace mcc2lm
             return hash;
         }
 
-        void save(sqlite3 *db)
+        void Save(sqlite3 *db)
         {
+            Logger logger("Sentence('" + value + "')::Save");
+
+            logger.Debug("Saving");
+
             if (words.empty())
             {
                 return;
@@ -81,9 +90,9 @@ namespace mcc2lm
                 GET_SENTENCE_BY_ID_QUERY,
                 [this, db](sqlite3_stmt *stmt)
                 {
-                    bind_int(db, stmt, 1, hash, "[Sentence::save] Failed to bind sentence ID");
+                    bind_int(db, stmt, 1, hash, "[Sentence::Save] Failed to bind sentence ID");
                 },
-                "[Sentence::save] Failed to select sentence");
+                "[Sentence::Save] Failed to select sentence");
 
             if (!already_exists)
             {
@@ -92,15 +101,15 @@ namespace mcc2lm
                     INSERT_SENTENCE_QUERY,
                     [this, db](sqlite3_stmt *stmt)
                     {
-                        bind_int(db, stmt, 1, hash, "[Sentence::save] Failed to bind sentence insert ID");
-                        bind_text(db, stmt, 2, value, "[Sentence::save] Failed to bind sentence value");
+                        bind_int(db, stmt, 1, hash, "[Sentence::Save] Failed to bind sentence insert ID");
+                        bind_text(db, stmt, 2, value, "[Sentence::Save] Failed to bind sentence value");
                     },
-                    "[Sentence::save] Failed to insert sentence");
+                    "[Sentence::Save] Failed to insert sentence");
             }
 
             for (Word &word : words)
             {
-                word.save(db);
+                word.Save(db);
 
                 ensure_mapping_row(
                     db,
@@ -108,11 +117,13 @@ namespace mcc2lm
                     INSERT_WORD_SENTENCE_MAP_QUERY,
                     [this, &word, db](sqlite3_stmt *stmt)
                     {
-                        bind_int(db, stmt, 1, hash, "[Sentence::save] Failed to bind sentence-word map sentence ID");
-                        bind_int(db, stmt, 2, word.get_hash(), "[Sentence::save] Failed to bind sentence-word map word ID");
+                        bind_int(db, stmt, 1, hash, "[Sentence::Save] Failed to bind sentence-word map sentence ID");
+                        bind_int(db, stmt, 2, word.get_hash(), "[Sentence::Save] Failed to bind sentence-word map word ID");
                     },
-                    "[Sentence::save] sentence-word map mutation");
+                    "[Sentence::Save] sentence-word map mutation");
             }
+
+            logger.Info("Saved");
         }
     };
 
@@ -130,20 +141,27 @@ namespace mcc2lm
             int8_t file_idx, int node_set_idx) : file_idx(file_idx),
                                                  node_set_idx(node_set_idx)
         {
+
             if (file_idx < 0 || file_idx >= static_cast<int8_t>(LCMC_FILENAMES.size()))
             {
                 return;
             }
 
+            Logger logger("SentenceIterator(" + LCMC_FILENAMES.at(file_idx) + ")");
+
+            logger.Debug("Initializing `SentenceIterator`");
+
             parser = std::make_shared<xmlpp::DomParser>();
             parser->parse_file(LCMC_BASEDIR + "/" + LCMC_FILENAMES.at(file_idx));
             if (!parser->get_document() || !parser->get_document()->get_root_node())
             {
-                throw DatabaseException("[SentenceIterator] Failed to parse sentence XML");
+                throw ParserException("[SentenceIterator] Failed to parse sentence XML");
                 return;
             }
 
             curr_node_set = parser->get_document()->get_root_node()->find("//s");
+
+            logger.Info("`SentenceIterator` initialized");
         }
 
         int8_t get_file_idx() const
@@ -158,7 +176,7 @@ namespace mcc2lm
 
         SentenceIterator begin() const
         {
-            SentenceIterator iterator(0, 0);
+            SentenceIterator iterator(file_idx, 0);
             if (!iterator.curr_node_set.empty())
             {
                 return iterator;
@@ -169,43 +187,21 @@ namespace mcc2lm
 
         SentenceIterator end() const
         {
-            return SentenceIterator(static_cast<int8_t>(LCMC_FILENAMES.size()), 0);
+            return SentenceIterator(file_idx, curr_node_set.size());
         }
 
-        SentenceIterator operator++() const
+        SentenceIterator &operator++()
         {
-            const int8_t files_count = static_cast<int8_t>(LCMC_FILENAMES.size());
-            if (file_idx >= files_count)
-            {
-                return SentenceIterator(files_count, 0);
-            }
-
-            int new_node_set_idx = node_set_idx + 1;
-            int8_t new_file_idx = file_idx;
-
-            if (new_node_set_idx >= static_cast<int>(curr_node_set.size()))
-            {
-                new_node_set_idx = 0;
-                new_file_idx++;
-            }
-
-            while (new_file_idx < files_count)
-            {
-                SentenceIterator candidate(new_file_idx, new_node_set_idx);
-                if (new_node_set_idx < static_cast<int>(candidate.curr_node_set.size()))
-                {
-                    return candidate;
-                }
-
-                new_file_idx++;
-                new_node_set_idx = 0;
-            }
-
-            return SentenceIterator(files_count, 0);
+            node_set_idx++;
+            return *this;
         }
 
         Sentence operator*() const
         {
+            Logger logger("SentenceIterator(" + LCMC_FILENAMES.at(file_idx) + ")::operator*");
+
+            logger.Debug("Instantiating `Sequence` for index {}", node_set_idx);
+
             xmlpp::Node *sentence_node = curr_node_set.at(node_set_idx);
             WordIterator iterator(sentence_node->find(".//w"), 0);
             std::vector<Word> word_seq;
@@ -227,7 +223,7 @@ namespace mcc2lm
                 return Sentence(sentence_value, word_seq);
             }
 
-            throw DatabaseException("[SentenceIterator::operator*] Sentence without words");
+            throw ParserException("[SentenceIterator::operator*] Sentence without words");
             return Sentence("", {});
         }
 

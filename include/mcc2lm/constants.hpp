@@ -25,6 +25,15 @@ namespace mcc2lm
         "LCMC_N.XML",
         "LCMC_P.XML",
         "LCMC_R.XML"};
+
+    enum LogLevel
+    {
+        DEBUG,
+        INFO,
+        WARNING,
+        ERROR,
+        CRITICAL
+    };
 }
 
 #endif
