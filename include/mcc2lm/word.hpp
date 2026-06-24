@@ -35,17 +35,13 @@ namespace mcc2lm
         const std::string GET_WORD_BY_ID_QUERY = "SELECT VALUE "
                                                  "FROM MCC2LM_WORD "
                                                  "WHERE ID = ?;";
-        const std::string INSERT_WORD_QUERY = "INSERT INTO MCC2LM_WORD (ID, VALUE, OCCURRENCIES) "
-                                              "VALUES (?, ?, 1);";
-        const std::string UPDATE_WORD_QUERY = "UPDATE MCC2LM_WORD "
-                                              "SET OCCURRENCIES = OCCURRENCIES + 1 "
-                                              "WHERE ID = ?;";
+        const std::string UPSERT_WORD_QUERY =
+            "INSERT INTO MCC2LM_WORD (ID, VALUE, OCCURRENCIES) "
+            "VALUES (?, ?, 1) "
+            "ON CONFLICT(ID) DO UPDATE SET OCCURRENCIES = MCC2LM_WORD.OCCURRENCIES + 1 "
+            "WHERE MCC2LM_WORD.VALUE = excluded.VALUE;";
 
         // MCC2LM_LOGOGRAM_WORD_MAP
-        const std::string GET_LOGOGRAM_WORD_MAP_BY_ID_QUERY = "SELECT ID "
-                                                              "FROM MCC2LM_LOGOGRAM_WORD_MAP "
-                                                              "WHERE WORD_ID = ? "
-                                                              "AND LOGOGRAM_ID = ?;";
         const std::string INSERT_LOGOGRAM_WORD_MAP_QUERY =
             "INSERT OR IGNORE INTO MCC2LM_LOGOGRAM_WORD_MAP (WORD_ID, LOGOGRAM_ID)"
             "VALUES (?, ?);";
@@ -121,6 +117,16 @@ namespace mcc2lm
             return static_cast<int>(raw_hash % INT_MAX);
         }
 
+        int next_hash_candidate(int current_hash) const
+        {
+            if (current_hash >= INT_MAX - 1)
+            {
+                return 1;
+            }
+
+            return current_hash + 1;
+        }
+
     public:
         Word(std::vector<mcc2lm::Logogram> logograms,
              std::string value,
@@ -142,13 +148,18 @@ namespace mcc2lm
             return hash;
         }
 
+        bool ShouldPersist() const
+        {
+            return !value.empty() && pos_tag != WordPosTag::IGNORE;
+        }
+
         void Save(sqlite3 *db)
         {
             Logger logger("Word('" + value + "')::Save");
 
             logger.Debug("Saving");
 
-            if (value.empty() || pos_tag == WordPosTag::IGNORE)
+            if (!ShouldPersist())
             {
                 return;
             }
@@ -158,46 +169,52 @@ namespace mcc2lm
                 "[Word::Save] immediate upsert",
                 [this, db]()
                 {
-                    const std::pair<bool, std::string> existing_word = optional_text_value(
-                        db,
-                        GET_WORD_BY_ID_QUERY,
-                        [this, db](sqlite3_stmt *stmt)
-                        {
-                            bind_int(db, stmt, 1, hash, "[Word::Save] Failed to bind word ID");
-                        },
-                        0,
-                        "[Word::Save] Failed to select word");
+                    int persisted_hash = hash;
+                    constexpr int max_probe_attempts = 2048;
 
-                    const bool already_exists = existing_word.first;
-                    const std::string &existing_value = existing_word.second;
-                    if (already_exists && existing_value != value)
+                    for (int attempt = 0; attempt < max_probe_attempts; ++attempt)
                     {
-                        throw ParserException("[Word::Save] Hash collision for word ID " + std::to_string(hash));
-                    }
-
-                    if (already_exists)
-                    {
-                        execute_non_query(
+                        const int changes = execute_non_query_with_changes(
                             db,
-                            UPDATE_WORD_QUERY,
-                            [this, db](sqlite3_stmt *stmt)
+                            UPSERT_WORD_QUERY,
+                            [this, persisted_hash, db](sqlite3_stmt *stmt)
                             {
-                                bind_int(db, stmt, 1, hash, "[Word::Save] Failed to bind word mutation ID");
-                            },
-                            "[Word::Save] Failed to persist word");
-                    }
-                    else
-                    {
-                        execute_non_query(
-                            db,
-                            INSERT_WORD_QUERY,
-                            [this, db](sqlite3_stmt *stmt)
-                            {
-                                bind_int(db, stmt, 1, hash, "[Word::Save] Failed to bind word mutation ID");
+                                bind_int(db, stmt, 1, persisted_hash, "[Word::Save] Failed to bind word mutation ID");
                                 bind_text(db, stmt, 2, value, "[Word::Save] Failed to bind word value");
                             },
                             "[Word::Save] Failed to persist word");
+
+                        if (changes > 0)
+                        {
+                            hash = persisted_hash;
+                            return;
+                        }
+
+                        const std::pair<bool, std::string> existing_word = optional_text_value(
+                            db,
+                            GET_WORD_BY_ID_QUERY,
+                            [persisted_hash, db](sqlite3_stmt *stmt)
+                            {
+                                bind_int(db, stmt, 1, persisted_hash, "[Word::Save] Failed to bind word ID");
+                            },
+                            0,
+                            "[Word::Save] Failed to select word");
+
+                        if (!existing_word.first)
+                        {
+                            throw DatabaseException("[Word::Save] Word upsert did not affect rows and no existing row was found");
+                        }
+
+                        if (existing_word.second == value)
+                        {
+                            hash = persisted_hash;
+                            return;
+                        }
+
+                        persisted_hash = next_hash_candidate(persisted_hash);
                     }
+
+                    throw DatabaseException("[Word::Save] Exhausted hash collision probe attempts for value '" + value + "'");
                 });
 
             for (mcc2lm::Logogram &logogram : logograms)
@@ -206,7 +223,6 @@ namespace mcc2lm
 
                 ensure_mapping_row(
                     db,
-                    GET_LOGOGRAM_WORD_MAP_BY_ID_QUERY,
                     INSERT_LOGOGRAM_WORD_MAP_QUERY,
                     [this, &logogram, db](sqlite3_stmt *stmt)
                     {

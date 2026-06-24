@@ -69,5 +69,4 @@ Testing/
 
 # Artefacts
 assets/
-*.db
-*.db-journal
+*.db*

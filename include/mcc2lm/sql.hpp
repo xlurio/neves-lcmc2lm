@@ -2,17 +2,69 @@
 
 #define MCC2LM_SQL_HPP
 
+#include <chrono>
 #include <functional>
 #include <string>
+#include <thread>
 #include <utility>
 #include <sqlite3.h>
 #include <mcc2lm/exceptions.hpp>
 
 namespace mcc2lm
 {
+    bool is_sqlite_lock_contention(int result)
+    {
+        return result == SQLITE_BUSY || result == SQLITE_LOCKED;
+    }
+
+    int lock_retry_delay_ms(int attempt)
+    {
+        const int base_delay_ms = 10;
+        const int max_delay_ms = 250;
+        const int scaled = base_delay_ms << attempt;
+        return scaled < max_delay_ms ? scaled : max_delay_ms;
+    }
+
+    template <typename Func>
+    int call_with_sqlite_lock_retry(Func &&callable)
+    {
+        constexpr int max_attempts = 8;
+        int last_result = SQLITE_OK;
+
+        for (int attempt = 0; attempt < max_attempts; ++attempt)
+        {
+            last_result = callable();
+            if (!is_sqlite_lock_contention(last_result))
+            {
+                return last_result;
+            }
+
+            if (attempt + 1 < max_attempts)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(lock_retry_delay_ms(attempt)));
+            }
+        }
+
+        return last_result;
+    }
+
     void throw_sqlite_error(sqlite3 *db, const std::string &context)
     {
         throw mcc2lm::DatabaseException(context + ": " + sqlite3_errmsg(db));
+    }
+
+    void execute_sqlite_exec(sqlite3 *db, const std::string &query, const std::string &context)
+    {
+        const int result = call_with_sqlite_lock_retry(
+            [&]()
+            {
+                return sqlite3_exec(db, query.c_str(), nullptr, nullptr, nullptr);
+            });
+
+        if (result != SQLITE_OK)
+        {
+            throw_sqlite_error(db, context);
+        }
     }
 
     class SqliteStatement
@@ -22,7 +74,13 @@ namespace mcc2lm
     public:
         SqliteStatement(sqlite3 *db, const std::string &query, const std::string &context)
         {
-            if (sqlite3_prepare_v2(db, query.c_str(), -1, &stmt, nullptr) != SQLITE_OK)
+            const int result = call_with_sqlite_lock_retry(
+                [&]()
+                {
+                    return sqlite3_prepare_v2(db, query.c_str(), -1, &stmt, nullptr);
+                });
+
+            if (result != SQLITE_OK)
             {
                 throw_sqlite_error(db, context);
             }
@@ -63,7 +121,12 @@ namespace mcc2lm
 
     bool step_is_row_or_done(sqlite3 *db, sqlite3_stmt *stmt, const std::string &context)
     {
-        const int result = sqlite3_step(stmt);
+        const int result = call_with_sqlite_lock_retry(
+            [&]()
+            {
+                return sqlite3_step(stmt);
+            });
+
         if (result == SQLITE_ROW)
         {
             return true;
@@ -80,7 +143,13 @@ namespace mcc2lm
 
     void step_expect_done(sqlite3 *db, sqlite3_stmt *stmt, const std::string &context)
     {
-        if (sqlite3_step(stmt) != SQLITE_DONE)
+        const int result = call_with_sqlite_lock_retry(
+            [&]()
+            {
+                return sqlite3_step(stmt);
+            });
+
+        if (result != SQLITE_DONE)
         {
             throw_sqlite_error(db, context);
         }
@@ -128,18 +197,24 @@ namespace mcc2lm
         step_expect_done(db, stmt.get(), context + " [step]");
     }
 
+    int execute_non_query_with_changes(
+        sqlite3 *db,
+        const std::string &query,
+        const std::function<void(sqlite3_stmt *)> &bind_params,
+        const std::string &context)
+    {
+        SqliteStatement stmt(db, query, context + " [prepare]");
+        bind_params(stmt.get());
+        step_expect_done(db, stmt.get(), context + " [step]");
+        return sqlite3_changes(db);
+    }
+
     void ensure_mapping_row(
         sqlite3 *db,
-        const std::string &exists_query,
         const std::string &insert_query,
         const std::function<void(sqlite3_stmt *)> &bind_keys,
         const std::string &context)
     {
-        if (row_exists(db, exists_query, bind_keys, context + " [exists]"))
-        {
-            return;
-        }
-
         execute_non_query(db, insert_query, bind_keys, context + " [insert]");
     }
 
@@ -148,13 +223,11 @@ namespace mcc2lm
     {
         if (sqlite3_get_autocommit(db) == 0)
         {
-            throw DatabaseException(context + " [begin]: transaction already active");
+            body();
+            return;
         }
 
-        if (sqlite3_exec(db, "BEGIN IMMEDIATE;", nullptr, nullptr, nullptr) != SQLITE_OK)
-        {
-            throw_sqlite_error(db, context + " [begin] Failed to start immediate transaction");
-        }
+        execute_sqlite_exec(db, "BEGIN IMMEDIATE;", context + " [begin] Failed to start immediate transaction");
 
         try
         {
@@ -164,23 +237,24 @@ namespace mcc2lm
         {
             if (sqlite3_get_autocommit(db) == 0)
             {
-                if (sqlite3_exec(db, "ROLLBACK;", nullptr, nullptr, nullptr) != SQLITE_OK)
-                {
-                    throw_sqlite_error(db, context + " [rollback] Failed to rollback immediate transaction");
-                }
+                execute_sqlite_exec(db, "ROLLBACK;", context + " [rollback] Failed to rollback immediate transaction");
             }
 
             throw;
         }
 
-        if (sqlite3_exec(db, "COMMIT;", nullptr, nullptr, nullptr) != SQLITE_OK)
+        try
+        {
+            execute_sqlite_exec(db, "COMMIT;", context + " [commit] Failed to commit immediate transaction");
+        }
+        catch (...)
         {
             if (sqlite3_get_autocommit(db) == 0)
             {
                 (void)sqlite3_exec(db, "ROLLBACK;", nullptr, nullptr, nullptr);
             }
 
-            throw_sqlite_error(db, context + " [commit] Failed to commit immediate transaction");
+            throw;
         }
     }
 }

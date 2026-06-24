@@ -12,14 +12,10 @@ namespace mcc2lm
     class Logogram
     {
         // MCC2LM_LOGOGRAM
-        const std::string GET_LOGOGRAM_BY_ID_QUERY = "SELECT ID "
-                                                     "FROM MCC2LM_LOGOGRAM "
-                                                     "WHERE ID = ?;";
-        const std::string INSERT_LOGOGRAM_QUERY = "INSERT INTO MCC2LM_LOGOGRAM (ID, OCCURRENCIES) "
-                                                  "VALUES (?, 1);";
-        const std::string UPDATE_LOGOGRAM_QUERY = "UPDATE MCC2LM_LOGOGRAM "
-                                                  "SET OCCURRENCIES = OCCURRENCIES + 1 "
-                                                  "WHERE ID = ?;";
+        const std::string UPSERT_LOGOGRAM_QUERY =
+            "INSERT INTO MCC2LM_LOGOGRAM (ID, OCCURRENCIES) "
+            "VALUES (?, 1) "
+            "ON CONFLICT(ID) DO UPDATE SET OCCURRENCIES = MCC2LM_LOGOGRAM.OCCURRENCIES + 1;";
 
         // ---
 
@@ -52,20 +48,9 @@ namespace mcc2lm
                 "[Logogram::Save] immediate upsert",
                 [this, db]()
                 {
-                    const bool already_exists = row_exists(
-                        db,
-                        GET_LOGOGRAM_BY_ID_QUERY,
-                        [this, db](sqlite3_stmt *stmt)
-                        {
-                            bind_text(db, stmt, 1, value, "[Logogram::Save] Failed to bind value ID");
-                        },
-                        "[Logogram::Save] Failed to select value");
-
-                    const std::string &query = already_exists ? UPDATE_LOGOGRAM_QUERY : INSERT_LOGOGRAM_QUERY;
-
                     execute_non_query(
                         db,
-                        query,
+                        UPSERT_LOGOGRAM_QUERY,
                         [this, db](sqlite3_stmt *stmt)
                         {
                             bind_text(db, stmt, 1, value, "[Logogram::Save] Failed to bind value mutation ID");

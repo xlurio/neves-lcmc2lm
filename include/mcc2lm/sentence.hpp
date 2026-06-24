@@ -14,19 +14,11 @@ namespace mcc2lm
     class Sentence
     {
         // MCC2LM_SENTENCE
-        const std::string GET_SENTENCE_BY_ID_QUERY = "SELECT ID "
-                                                     "FROM MCC2LM_SENTENCE "
-                                                     "WHERE ID = ?;";
         const std::string INSERT_SENTENCE_QUERY =
             "INSERT OR IGNORE INTO MCC2LM_SENTENCE "
             "VALUES (?, ?);";
 
         // MCC2LM_WORD_SENTENCE_MAP
-        const std::string GET_WORD_SENTENCE_MAP_BY_ID_QUERY =
-            "SELECT ID "
-            "FROM MCC2LM_WORD_SENTENCE_MAP "
-            "WHERE SENTENCE_ID = ? "
-            "AND WORD_ID = ?;";
         const std::string INSERT_WORD_SENTENCE_MAP_QUERY =
             "INSERT OR IGNORE INTO MCC2LM_WORD_SENTENCE_MAP (SENTENCE_ID, WORD_ID)"
             "VALUES (?, ?);";
@@ -76,46 +68,43 @@ namespace mcc2lm
             return hash;
         }
 
+        bool ShouldPersist() const
+        {
+            return !words.empty();
+        }
+
         void Save(sqlite3 *db)
         {
             Logger logger("Sentence('" + value + "')::Save");
 
             logger.Debug("Saving");
 
-            if (words.empty())
+            if (!ShouldPersist())
             {
                 return;
             }
 
-            const bool already_exists = row_exists(
+            execute_non_query(
                 db,
-                GET_SENTENCE_BY_ID_QUERY,
+                INSERT_SENTENCE_QUERY,
                 [this, db](sqlite3_stmt *stmt)
                 {
-                    bind_int(db, stmt, 1, hash, "[Sentence::Save] Failed to bind sentence ID");
+                    bind_int(db, stmt, 1, hash, "[Sentence::Save] Failed to bind sentence insert ID");
+                    bind_text(db, stmt, 2, value, "[Sentence::Save] Failed to bind sentence value");
                 },
-                "[Sentence::Save] Failed to select sentence");
-
-            if (!already_exists)
-            {
-                execute_non_query(
-                    db,
-                    INSERT_SENTENCE_QUERY,
-                    [this, db](sqlite3_stmt *stmt)
-                    {
-                        bind_int(db, stmt, 1, hash, "[Sentence::Save] Failed to bind sentence insert ID");
-                        bind_text(db, stmt, 2, value, "[Sentence::Save] Failed to bind sentence value");
-                    },
-                    "[Sentence::Save] Failed to insert sentence");
-            }
+                "[Sentence::Save] Failed to insert sentence");
 
             for (Word &word : words)
             {
                 word.Save(db);
 
+                if (!word.ShouldPersist())
+                {
+                    continue;
+                }
+
                 ensure_mapping_row(
                     db,
-                    GET_WORD_SENTENCE_MAP_BY_ID_QUERY,
                     INSERT_WORD_SENTENCE_MAP_QUERY,
                     [this, &word, db](sqlite3_stmt *stmt)
                     {
@@ -225,7 +214,7 @@ namespace mcc2lm
                 return Sentence(sentence_value, word_seq);
             }
 
-            throw ParserException("[SentenceIterator::operator*] Sentence without words");
+            logger.Debug("Skipping sentence without words at node index {}", node_set_idx);
             return Sentence("", {});
         }
 
