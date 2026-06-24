@@ -17,19 +17,32 @@
 #include <mcc2lm/sentence.hpp>
 
 // CREATE TABLE
+const std::string CREATE_RADICAL_TABLE_QUERY =
+    "CREATE TABLE IF NOT EXISTS MCC2LM_RADICAL("
+    "ID VARCHAR(4) PRIMARY KEY);";
 const std::string CREATE_LOGOGRAM_TABLE_QUERY =
     "CREATE TABLE IF NOT EXISTS MCC2LM_LOGOGRAM("
-    "ID VARCHAR(255) PRIMARY KEY,"
+    "ID VARCHAR(4) PRIMARY KEY,"
     "OCCURRENCIES INTEGER);";
-const std::string CREATE_WORD_TABLE_QUERY = "CREATE TABLE IF NOT EXISTS MCC2LM_WORD("
-                                            "ID INTEGER PRIMARY KEY,"
-                                            "VALUE TEXT,"
-                                            "OCCURRENCIES INTEGER);";
+const std::string CREATE_RADICAL_LOGOGRAM_MAP_TABLE_QUERY =
+    "CREATE TABLE IF NOT EXISTS MCC2LM_RADICAL_LOGOGRAM_MAP("
+    "ID INTEGER PRIMARY KEY AUTOINCREMENT,"
+    "LOGOGRAM_ID VARCHAR(4),"
+    "RADICAL_ID VARCHAR(4),"
+    "UNIQUE(LOGOGRAM_ID, RADICAL_ID),"
+    "FOREIGN KEY(LOGOGRAM_ID) REFERENCES MCC2LM_LOGOGRAM(ID),"
+    "FOREIGN KEY(RADICAL_ID) REFERENCES MCC2LM_RADICAL(ID));";
+const std::string CREATE_WORD_TABLE_QUERY =
+    "CREATE TABLE IF NOT EXISTS MCC2LM_WORD("
+    "ID INTEGER PRIMARY KEY,"
+    "VALUE TEXT,"
+    "POS_TAG VARCHAR(255),"
+    "OCCURRENCIES INTEGER);";
 const std::string CREATE_LOGOGRAM_WORD_MAP_TABLE_QUERY =
     "CREATE TABLE IF NOT EXISTS MCC2LM_LOGOGRAM_WORD_MAP("
     "ID INTEGER PRIMARY KEY AUTOINCREMENT,"
     "WORD_ID INTEGER,"
-    "LOGOGRAM_ID VARCHAR(255),"
+    "LOGOGRAM_ID VARCHAR(4),"
     "UNIQUE(WORD_ID, LOGOGRAM_ID),"
     "FOREIGN KEY(WORD_ID) REFERENCES MCC2LM_WORD(ID),"
     "FOREIGN KEY(LOGOGRAM_ID) REFERENCES MCC2LM_LOGOGRAM(ID));";
@@ -100,10 +113,12 @@ namespace
 
         mcc2lm::execute_sqlite_exec(
             connection.get(),
-            CREATE_LOGOGRAM_TABLE_QUERY            //
-                + CREATE_WORD_TABLE_QUERY          //
-                + CREATE_LOGOGRAM_WORD_MAP_TABLE_QUERY
-                + CREATE_SENTENCE_TABLE_QUERY
+            CREATE_RADICAL_TABLE_QUERY                    //
+                + CREATE_LOGOGRAM_TABLE_QUERY             //
+                + CREATE_RADICAL_LOGOGRAM_MAP_TABLE_QUERY //
+                + CREATE_WORD_TABLE_QUERY                 //
+                + CREATE_LOGOGRAM_WORD_MAP_TABLE_QUERY    //
+                + CREATE_SENTENCE_TABLE_QUERY             //
                 + CREATE_WORD_SENTENCE_MAP_TABLE_QUERY,
             "[main] Failed to create database schema");
     }

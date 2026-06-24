@@ -8,6 +8,7 @@
 namespace mcc2lm
 {
     inline const std::string LCMC_BASEDIR = "assets/Lcmc/data/character";
+    inline const std::string UNIHAN_RADICAL_STROKE_COUNTS_PATH = "assets/Unihan/Unihan_RadicalStrokeCounts.txt";
 
     inline const std::array<std::string, 15> LCMC_FILENAMES = {
         "LCMC_A.XML",

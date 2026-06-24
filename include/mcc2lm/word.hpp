@@ -36,8 +36,8 @@ namespace mcc2lm
                                                  "FROM MCC2LM_WORD "
                                                  "WHERE ID = ?;";
         const std::string UPSERT_WORD_QUERY =
-            "INSERT INTO MCC2LM_WORD (ID, VALUE, OCCURRENCIES) "
-            "VALUES (?, ?, 1) "
+            "INSERT INTO MCC2LM_WORD "
+            "(ID, VALUE, POS_TAG, OCCURRENCIES) VALUES (?, ?, ?, 1) "
             "ON CONFLICT(ID) DO UPDATE SET OCCURRENCIES = MCC2LM_WORD.OCCURRENCIES + 1 "
             "WHERE MCC2LM_WORD.VALUE = excluded.VALUE;";
 
@@ -148,6 +148,39 @@ namespace mcc2lm
             return hash;
         }
 
+        std::string get_verbose_pos_tag() const
+        {
+            switch (pos_tag)
+            {
+            case WordPosTag::ADJECTIVE:
+                return "ADJECTIVE";
+            case WordPosTag::ADVERB:
+                return "ADVERB";
+            case WordPosTag::CONJUCTION:
+                return "CONJUCTION";
+            case WordPosTag::INTERJECTION:
+                return "INTERJECTION";
+            case WordPosTag::MODAL_PARTICLE:
+                return "MODAL_PARTICLE";
+            case WordPosTag::NOUN:
+                return "NOUN";
+            case WordPosTag::NUMERAL:
+                return "NUMERAL";
+            case WordPosTag::ONOMATOPOEIA:
+                return "ONOMATOPOEIA";
+            case WordPosTag::PREPOSITION:
+                return "PREPOSITION";
+            case WordPosTag::PRONOUN:
+                return "PRONOUN";
+            case WordPosTag::VERB:
+                return "VERB";
+            case WordPosTag::UNCLASSIFIED:
+                return "UNCLASSIFIED";
+            }
+
+            return "IGNORE";
+        }
+
         bool ShouldPersist() const
         {
             return !value.empty() && pos_tag != WordPosTag::IGNORE;
@@ -179,8 +212,24 @@ namespace mcc2lm
                             UPSERT_WORD_QUERY,
                             [this, persisted_hash, db](sqlite3_stmt *stmt)
                             {
-                                bind_int(db, stmt, 1, persisted_hash, "[Word::Save] Failed to bind word mutation ID");
-                                bind_text(db, stmt, 2, value, "[Word::Save] Failed to bind word value");
+                                bind_int(
+                                    db,
+                                    stmt,
+                                    1,
+                                    persisted_hash,
+                                    "[Word::Save] Failed to bind word mutation ID");
+                                bind_text(
+                                    db,
+                                    stmt,
+                                    2,
+                                    value,
+                                    "[Word::Save] Failed to bind word value");
+                                bind_text(
+                                    db,
+                                    stmt,
+                                    3,
+                                    get_verbose_pos_tag(),
+                                    "[Word::Save] Failed to bind word POS tag");
                             },
                             "[Word::Save] Failed to persist word");
 

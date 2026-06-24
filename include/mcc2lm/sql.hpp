@@ -12,12 +12,12 @@
 
 namespace mcc2lm
 {
-    bool is_sqlite_lock_contention(int result)
+    inline bool is_sqlite_lock_contention(int result)
     {
         return result == SQLITE_BUSY || result == SQLITE_LOCKED;
     }
 
-    int lock_retry_delay_ms(int attempt)
+    inline int lock_retry_delay_ms(int attempt)
     {
         const int base_delay_ms = 10;
         const int max_delay_ms = 250;
@@ -48,12 +48,12 @@ namespace mcc2lm
         return last_result;
     }
 
-    void throw_sqlite_error(sqlite3 *db, const std::string &context)
+    inline void throw_sqlite_error(sqlite3 *db, const std::string &context)
     {
         throw mcc2lm::DatabaseException(context + ": " + sqlite3_errmsg(db));
     }
 
-    void execute_sqlite_exec(sqlite3 *db, const std::string &query, const std::string &context)
+    inline void execute_sqlite_exec(sqlite3 *db, const std::string &query, const std::string &context)
     {
         const int result = call_with_sqlite_lock_retry(
             [&]()
@@ -103,7 +103,7 @@ namespace mcc2lm
         }
     };
 
-    void bind_int(sqlite3 *db, sqlite3_stmt *stmt, int idx, int value, const std::string &context)
+    inline void bind_int(sqlite3 *db, sqlite3_stmt *stmt, int idx, int value, const std::string &context)
     {
         if (sqlite3_bind_int(stmt, idx, value) != SQLITE_OK)
         {
@@ -111,7 +111,7 @@ namespace mcc2lm
         }
     }
 
-    void bind_text(sqlite3 *db, sqlite3_stmt *stmt, int idx, const std::string &value, const std::string &context)
+    inline void bind_text(sqlite3 *db, sqlite3_stmt *stmt, int idx, const std::string &value, const std::string &context)
     {
         if (sqlite3_bind_text(stmt, idx, value.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
         {
@@ -119,7 +119,7 @@ namespace mcc2lm
         }
     }
 
-    bool step_is_row_or_done(sqlite3 *db, sqlite3_stmt *stmt, const std::string &context)
+    inline bool step_is_row_or_done(sqlite3 *db, sqlite3_stmt *stmt, const std::string &context)
     {
         const int result = call_with_sqlite_lock_retry(
             [&]()
@@ -141,7 +141,7 @@ namespace mcc2lm
         return false;
     }
 
-    void step_expect_done(sqlite3 *db, sqlite3_stmt *stmt, const std::string &context)
+    inline void step_expect_done(sqlite3 *db, sqlite3_stmt *stmt, const std::string &context)
     {
         const int result = call_with_sqlite_lock_retry(
             [&]()
@@ -155,7 +155,7 @@ namespace mcc2lm
         }
     }
 
-    bool row_exists(
+    inline bool row_exists(
         sqlite3 *db,
         const std::string &query,
         const std::function<void(sqlite3_stmt *)> &bind_params,
@@ -166,7 +166,7 @@ namespace mcc2lm
         return step_is_row_or_done(db, stmt.get(), context + " [step]");
     }
 
-    std::pair<bool, std::string> optional_text_value(
+    inline std::pair<bool, std::string> optional_text_value(
         sqlite3 *db,
         const std::string &query,
         const std::function<void(sqlite3_stmt *)> &bind_params,
@@ -186,7 +186,7 @@ namespace mcc2lm
         return std::make_pair(true, value);
     }
 
-    void execute_non_query(
+    inline void execute_non_query(
         sqlite3 *db,
         const std::string &query,
         const std::function<void(sqlite3_stmt *)> &bind_params,
@@ -197,7 +197,7 @@ namespace mcc2lm
         step_expect_done(db, stmt.get(), context + " [step]");
     }
 
-    int execute_non_query_with_changes(
+    inline int execute_non_query_with_changes(
         sqlite3 *db,
         const std::string &query,
         const std::function<void(sqlite3_stmt *)> &bind_params,
@@ -209,7 +209,7 @@ namespace mcc2lm
         return sqlite3_changes(db);
     }
 
-    void ensure_mapping_row(
+    inline void ensure_mapping_row(
         sqlite3 *db,
         const std::string &insert_query,
         const std::function<void(sqlite3_stmt *)> &bind_keys,
