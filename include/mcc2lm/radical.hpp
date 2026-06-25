@@ -3,7 +3,6 @@
 #define MCC2LM_RADICAL_HPP
 
 #include <string>
-#include <utility>
 #include <vector>
 #include <mcc2lm/sql.hpp>
 #include <cstdint>
@@ -11,36 +10,10 @@
 
 namespace mcc2lm
 {
-    class CharacterMetadata
+    struct CharacterMetadata
     {
         std::string pinyin;
         std::string meaning;
-
-    public:
-        CharacterMetadata(std::string pinyin, std::string meaning) : pinyin(std::move(pinyin)),
-                                                                     meaning(std::move(meaning))
-        {
-            if (!this->pinyin.empty() && !this->meaning.empty())
-            {
-                return;
-            }
-
-            throw ParserException(
-                "Not enough information to build `CharacterMetadata`: pinyin=" +
-                this->pinyin +
-                " meaning=" +
-                this->meaning);
-        }
-
-        const std::string &get_pinyin() const
-        {
-            return pinyin;
-        }
-
-        const std::string &get_meaning() const
-        {
-            return meaning;
-        }
     };
 
     std::vector<std::string> get_radicals_from_logogram(std::string logogram_value);
@@ -174,7 +147,7 @@ namespace mcc2lm
         {
             const std::string radical_value = raw_radicals.at(curr_idx);
             const CharacterMetadata metadata = get_unihan_metadata(radical_value);
-            return Radical(radical_value, metadata.get_pinyin(), metadata.get_meaning());
+            return Radical(radical_value, metadata.pinyin, metadata.meaning);
         }
 
         bool operator!=(const RadicalIterator &rhs) const

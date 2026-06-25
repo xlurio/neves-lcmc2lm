@@ -3,8 +3,8 @@ Logogram::Logogram(std::string value) : value(value)
     Logger logger("Logogram(" + value + ")");
 
     const CharacterMetadata metadata = get_unihan_metadata(value);
-    pinyin = metadata.get_pinyin();
-    meaning = metadata.get_meaning();
+    pinyin = metadata.pinyin;
+    meaning = metadata.meaning;
 
     logger.Debug("`Logogram` initialized");
 }

@@ -91,8 +91,8 @@ namespace mcc2lm
             {
                 const MetadataIndex::const_iterator metadata_it = metadata_index.find(entry.first);
                 if (metadata_it == metadata_index.end() ||
-                    metadata_it->second.get_pinyin().empty() ||
-                    metadata_it->second.get_meaning().empty())
+                    metadata_it->second.pinyin.empty() ||
+                    metadata_it->second.meaning.empty())
                 {
                     continue;
                 }
