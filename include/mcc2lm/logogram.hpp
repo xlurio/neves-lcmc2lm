@@ -58,8 +58,8 @@ namespace mcc2lm
         bool operator!=(const LogogramIterator &rhs) const;
     };
 
-#include <mcc2lm/logogram_value_impl.inc>
-#include <mcc2lm/logogram_iterator_impl.inc>
+#include <mcc2lm/impl/logogram_value_impl.inc>
+#include <mcc2lm/impl/logogram_iterator_impl.inc>
 }
 
 #endif

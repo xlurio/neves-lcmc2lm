@@ -60,8 +60,8 @@ namespace mcc2lm
         bool operator!=(const SentenceIterator &rhs) const;
     };
 
-#include <mcc2lm/sentence_value_impl.inc>
-#include <mcc2lm/sentence_iterator_impl.inc>
+#include <mcc2lm/impl/sentence_value_impl.inc>
+#include <mcc2lm/impl/sentence_iterator_impl.inc>
 }
 
 #endif

@@ -12,9 +12,9 @@
 
 namespace mcc2lm
 {
-#include <mcc2lm/sql_core.inc>
-#include <mcc2lm/sql_query_ops.inc>
-#include <mcc2lm/sql_transaction.inc>
+#include <mcc2lm/impl/sql_core.inc>
+#include <mcc2lm/impl/sql_query_ops.inc>
+#include <mcc2lm/impl/sql_transaction.inc>
 }
 
 #endif

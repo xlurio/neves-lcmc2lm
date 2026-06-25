@@ -89,9 +89,9 @@ namespace mcc2lm
         bool operator!=(const WordIterator &rhs) const;
     };
 
-#include <mcc2lm/word_word_impl.inc>
-#include <mcc2lm/word_save_impl.inc>
-#include <mcc2lm/word_iterator_impl.inc>
+#include <mcc2lm/impl/word_word_impl.inc>
+#include <mcc2lm/impl/word_save_impl.inc>
+#include <mcc2lm/impl/word_iterator_impl.inc>
 }
 
 #endif
