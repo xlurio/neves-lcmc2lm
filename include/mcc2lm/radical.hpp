@@ -42,12 +42,27 @@ namespace mcc2lm
 
     public:
         Radical(std::string value,
-                std::string pinyin = "",
-                std::string meaning = "") : value(value),
-                                            pinyin(pinyin),
-                                            meaning(meaning) {}
+                std::string pinyin,
+                std::string meaning) : value(value),
+                                       pinyin(pinyin),
+                                       meaning(meaning)
+        {
+            if (value.length() > 0 && pinyin.length() > 0 && meaning.length() > 0)
+            {
+                return;
+            }
 
-        std::string get_value() const {
+            throw ParserException(
+                "Not enough information to build `Radical`: value=" //
+                + value                                             //
+                + "pinyin="                                         //
+                + pinyin                                            //
+                + "meaning="                                        //
+                + meaning);
+        }
+
+        std::string get_value() const
+        {
             return value;
         }
 
