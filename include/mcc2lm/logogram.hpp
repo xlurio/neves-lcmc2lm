@@ -38,6 +38,7 @@ namespace mcc2lm
 
     public:
         Logogram(std::string value);
+        bool ShouldPersist() const;
         const std::string &get_id() const;
         void Save(sqlite3 *db);
     };

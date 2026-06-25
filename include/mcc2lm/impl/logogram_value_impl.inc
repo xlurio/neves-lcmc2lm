@@ -14,13 +14,18 @@ const std::string &Logogram::get_id() const
     return value;
 }
 
+bool Logogram::ShouldPersist() const
+{
+    return !value.empty() && !pinyin.empty() && !meaning.empty();
+}
+
 void Logogram::Save(sqlite3 *db)
 {
     Logger logger("Logogram('" + value + "')::Save");
 
     logger.Debug("Saving");
 
-    if (value.empty())
+    if (!ShouldPersist())
     {
         return;
     }

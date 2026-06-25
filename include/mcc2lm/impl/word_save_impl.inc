@@ -80,6 +80,11 @@ void Word::Save(sqlite3 *db)
 
     for (mcc2lm::Logogram &logogram : logograms)
     {
+        if (!logogram.ShouldPersist())
+        {
+            continue;
+        }
+
         logogram.Save(db);
 
         ensure_mapping_row(
