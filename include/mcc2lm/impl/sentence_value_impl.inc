@@ -38,7 +38,14 @@ int Sentence::get_hash() const
 
 bool Sentence::ShouldPersist() const
 {
-    return !words.empty();
+    for (const Word &word : words)
+    {
+        if (word.ShouldPersist())
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 void Sentence::Save(sqlite3 *db)
