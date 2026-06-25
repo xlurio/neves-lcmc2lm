@@ -55,9 +55,9 @@ namespace mcc2lm
             throw ParserException(
                 "Not enough information to build `Radical`: value=" //
                 + value                                             //
-                + "pinyin="                                         //
+                + " pinyin="                                        //
                 + pinyin                                            //
-                + "meaning="                                        //
+                + " meaning="                                       //
                 + meaning);
         }
 
