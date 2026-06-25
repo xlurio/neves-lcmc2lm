@@ -141,32 +141,51 @@ namespace mcc2lm
 
             std::size_t with_pinyin = 0;
             std::size_t with_meaning = 0;
+            std::size_t complete_entries = 0;
 
             for (const auto &entry : pinyin_values)
             {
-                CharacterMetadata &metadata = index[entry.first];
-                metadata.pinyin = join_values(entry.second);
-                if (!metadata.pinyin.empty())
+                const std::string pinyin = join_values(entry.second);
+                if (!pinyin.empty())
                 {
                     ++with_pinyin;
                 }
+                else
+                {
+                    continue;
+                }
+
+                const MetadataAccumulator::const_iterator meaning_it = meaning_values.find(entry.first);
+                if (meaning_it == meaning_values.end())
+                {
+                    continue;
+                }
+
+                const std::string meaning = join_values(meaning_it->second);
+                if (meaning.empty())
+                {
+                    continue;
+                }
+
+                index.emplace(entry.first, CharacterMetadata(pinyin, meaning));
+                ++complete_entries;
             }
 
             for (const auto &entry : meaning_values)
             {
-                CharacterMetadata &metadata = index[entry.first];
-                metadata.meaning = join_values(entry.second);
-                if (!metadata.meaning.empty())
+                const std::string meaning = join_values(entry.second);
+                if (!meaning.empty())
                 {
                     ++with_meaning;
                 }
             }
 
             logger.Info(
-                "Loaded Unihan metadata index (rows scanned: {}, pinyin entries: {}, meaning entries: {})",
+                "Loaded Unihan metadata index (rows scanned: {}, pinyin entries: {}, meaning entries: {}, complete entries: {})",
                 row_count,
                 with_pinyin,
-                with_meaning);
+                with_meaning,
+                complete_entries);
         }
     }
 }

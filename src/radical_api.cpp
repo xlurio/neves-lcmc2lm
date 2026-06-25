@@ -31,28 +31,28 @@ namespace mcc2lm
     {
         if (logogram_value.empty())
         {
-            return CharacterMetadata{"", ""};
+            throw ParserException("[get_unihan_metadata] Empty logogram value");
         }
 
         const detail::MetadataIndex &index = detail::get_metadata_index();
         const detail::MetadataIndex::const_iterator it = index.find(logogram_value);
 
-        CharacterMetadata metadata = CharacterMetadata{"", ""};
-
         if (it != index.end())
         {
-            metadata = it->second;
+            return it->second;
         }
+
+        std::string pinyin;
+        std::string meaning;
 
         std::uint32_t codepoint = 0;
         if (!detail::decode_utf8_single_codepoint(logogram_value, codepoint) ||
-            !detail::is_kangxi_radical_codepoint(codepoint) ||
-            (!metadata.pinyin.empty() && !metadata.meaning.empty()))
+            !detail::is_kangxi_radical_codepoint(codepoint))
         {
-            return metadata;
+            throw ParserException("[get_unihan_metadata] Metadata not found for logogram: " + logogram_value);
         }
 
-        const auto merge_from_base_character = [&index, &metadata](const std::string &base_character)
+        const auto merge_from_base_character = [&index, &pinyin, &meaning](const std::string &base_character)
         {
             const detail::MetadataIndex::const_iterator base_metadata_it = index.find(base_character);
             if (base_metadata_it == index.end())
@@ -60,14 +60,14 @@ namespace mcc2lm
                 return;
             }
 
-            if (metadata.pinyin.empty())
+            if (pinyin.empty())
             {
-                metadata.pinyin = base_metadata_it->second.pinyin;
+                pinyin = base_metadata_it->second.get_pinyin();
             }
 
-            if (metadata.meaning.empty())
+            if (meaning.empty())
             {
-                metadata.meaning = base_metadata_it->second.meaning;
+                meaning = base_metadata_it->second.get_meaning();
             }
         };
 
@@ -78,9 +78,9 @@ namespace mcc2lm
             merge_from_base_character(fallback_it->second);
         }
 
-        if (!metadata.pinyin.empty() && !metadata.meaning.empty())
+        if (!pinyin.empty() && !meaning.empty())
         {
-            return metadata;
+            return CharacterMetadata(pinyin, meaning);
         }
 
         const detail::RadicalFallbackIndex &metadata_fallback_index = detail::get_radical_metadata_fallback_index();
@@ -90,6 +90,11 @@ namespace mcc2lm
             merge_from_base_character(metadata_fallback_it->second);
         }
 
-        return metadata;
+        if (!pinyin.empty() && !meaning.empty())
+        {
+            return CharacterMetadata(pinyin, meaning);
+        }
+
+        throw ParserException("[get_unihan_metadata] Metadata not found for logogram: " + logogram_value);
     }
 }
