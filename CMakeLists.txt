@@ -9,7 +9,20 @@ find_package(libxmlpp REQUIRED)
 find_package(SQLite3 REQUIRED)
 find_package(Threads REQUIRED)
 
-add_executable(mcc2lm src/main.cpp src/radical.cpp)
+add_executable(
+    mcc2lm
+    src/main.cpp
+    src/schema.cpp
+    src/process.cpp
+    src/radical.cpp
+    src/radical_utf8.cpp
+    src/radical_parse.cpp
+    src/radical_load.cpp
+    src/radical_load_radicals.cpp
+    src/radical_load_fallback.cpp
+    src/radical_api.cpp
+    src/radical_load_radicals.cpp
+    src/radical_load_fallback.cpp)
 
 target_include_directories(mcc2lm PUBLIC include)
 
