@@ -127,7 +127,20 @@ std::string Word::get_verbose_pos_tag() const
 
 bool Word::ShouldPersist() const
 {
-    return !value.empty() && pos_tag != WordPosTag::IGNORE;
+    if (value.empty() || pos_tag == WordPosTag::IGNORE)
+    {
+        return false;
+    }
+
+    for (const mcc2lm::Logogram &logogram : logograms)
+    {
+        if (logogram.ShouldPersist())
+        {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 const std::string &Word::get_value() const
