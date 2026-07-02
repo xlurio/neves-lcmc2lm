@@ -43,7 +43,7 @@ namespace mcc2lm
 
         // MCC2LM_LOGOGRAM_WORD_MAP
         const std::string INSERT_LOGOGRAM_WORD_MAP_QUERY =
-            "INSERT OR IGNORE INTO MCC2LM_LOGOGRAM_WORD_MAP (WORD_ID, LOGOGRAM_ID)"
+            "INSERT OR IGNORE INTO MCC2LM_LOGOGRAM_WORD_MAP (WORD_ID, LOGOGRAM_ID) "
             "VALUES (?, ?);";
 
         // ---
@@ -89,9 +89,8 @@ namespace mcc2lm
         bool operator!=(const WordIterator &rhs) const;
     };
 
-#include <mcc2lm/impl/word_word_impl.inc>
-#include <mcc2lm/impl/word_save_impl.inc>
-#include <mcc2lm/impl/word_iterator_impl.inc>
+#include <mcc2lm/impl/word_impl_part1.inc>
+#include <mcc2lm/impl/word_impl_part2.inc>
 }
 
 #endif

@@ -97,3 +97,34 @@ bool SentenceIterator::operator!=(const SentenceIterator &rhs) const
     return get_file_idx() != rhs.get_file_idx() ||
            get_curr_node_set_idx() != rhs.get_curr_node_set_idx();
 }
+int Sentence::hash_from_unordered_words() const
+{
+    std::vector<std::string> sorted_values;
+    sorted_values.reserve(words.size());
+
+    for (const Word &word : words)
+    {
+        sorted_values.push_back(word.get_value());
+    }
+
+    std::sort(sorted_values.begin(), sorted_values.end());
+
+    std::string canonical;
+    for (const std::string &word_value : sorted_values)
+    {
+        canonical.push_back('\x1f');
+        canonical += word_value;
+    }
+
+    const std::size_t raw_hash = std::hash<std::string>{}(canonical);
+    return static_cast<int>(raw_hash % INT_MAX);
+}
+
+Sentence::Sentence(std::string value, std::vector<Word> words) : value(value),
+                                                                 words(words)
+{
+    Logger logger("Sentence('" + value + "')");
+
+    hash = hash_from_unordered_words();
+
+    logger.Debug("`Sentence` initialized");

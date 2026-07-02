@@ -1,3 +1,6 @@
+
+    logger.Debug("Saved");
+}
 WordPosTag Word::PosTagFromRaw(std::string raw_pos_tag)
 {
     if (raw_pos_tag == "a" || raw_pos_tag == "ad" || raw_pos_tag == "ag" ||

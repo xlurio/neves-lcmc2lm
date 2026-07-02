@@ -123,20 +123,3 @@ inline bool step_is_row_or_done(sqlite3 *db, sqlite3_stmt *stmt, const std::stri
         return false;
     }
 
-    throw_sqlite_error(db, context);
-    return false;
-}
-
-inline void step_expect_done(sqlite3 *db, sqlite3_stmt *stmt, const std::string &context)
-{
-    const int result = call_with_sqlite_lock_retry(
-        [&]()
-        {
-            return sqlite3_step(stmt);
-        });
-
-    if (result != SQLITE_DONE)
-    {
-        throw_sqlite_error(db, context);
-    }
-}

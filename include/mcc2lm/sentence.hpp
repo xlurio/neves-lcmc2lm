@@ -8,6 +8,7 @@
 #include <mcc2lm/constants.hpp>
 #include <algorithm>
 #include <mcc2lm/logger.hpp>
+#include <mcc2lm/ngram.hpp>
 
 namespace mcc2lm
 {
@@ -20,7 +21,7 @@ namespace mcc2lm
 
         // MCC2LM_WORD_SENTENCE_MAP
         const std::string INSERT_WORD_SENTENCE_MAP_QUERY =
-            "INSERT OR IGNORE INTO MCC2LM_WORD_SENTENCE_MAP (SENTENCE_ID, WORD_ID)"
+            "INSERT OR IGNORE INTO MCC2LM_WORD_SENTENCE_MAP (SENTENCE_ID, WORD_ID) "
             "VALUES (?, ?);";
 
         // ---
@@ -60,8 +61,8 @@ namespace mcc2lm
         bool operator!=(const SentenceIterator &rhs) const;
     };
 
-#include <mcc2lm/impl/sentence_value_impl.inc>
-#include <mcc2lm/impl/sentence_iterator_impl.inc>
+#include <mcc2lm/impl/sentence_impl_part1.inc>
+#include <mcc2lm/impl/sentence_impl_part2.inc>
 }
 
 #endif

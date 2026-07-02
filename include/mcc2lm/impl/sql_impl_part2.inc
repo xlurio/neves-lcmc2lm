@@ -1,3 +1,20 @@
+    throw_sqlite_error(db, context);
+    return false;
+}
+
+inline void step_expect_done(sqlite3 *db, sqlite3_stmt *stmt, const std::string &context)
+{
+    const int result = call_with_sqlite_lock_retry(
+        [&]()
+        {
+            return sqlite3_step(stmt);
+        });
+
+    if (result != SQLITE_DONE)
+    {
+        throw_sqlite_error(db, context);
+    }
+}
 inline bool row_exists(
     sqlite3 *db,
     const std::string &query,
@@ -59,4 +76,43 @@ inline void ensure_mapping_row(
     const std::string &context)
 {
     execute_non_query(db, insert_query, bind_keys, context + " [insert]");
+}
+template <typename Func>
+void run_in_immediate_transaction(sqlite3 *db, const std::string &context, Func &&body)
+{
+    if (sqlite3_get_autocommit(db) == 0)
+    {
+        body();
+        return;
+    }
+
+    execute_sqlite_exec(db, "BEGIN IMMEDIATE;", context + " [begin] Failed to start immediate transaction");
+
+    try
+    {
+        body();
+    }
+    catch (...)
+    {
+        if (sqlite3_get_autocommit(db) == 0)
+        {
+            execute_sqlite_exec(db, "ROLLBACK;", context + " [rollback] Failed to rollback immediate transaction");
+        }
+
+        throw;
+    }
+
+    try
+    {
+        execute_sqlite_exec(db, "COMMIT;", context + " [commit] Failed to commit immediate transaction");
+    }
+    catch (...)
+    {
+        if (sqlite3_get_autocommit(db) == 0)
+        {
+            (void)sqlite3_exec(db, "ROLLBACK;", nullptr, nullptr, nullptr);
+        }
+
+        throw;
+    }
 }

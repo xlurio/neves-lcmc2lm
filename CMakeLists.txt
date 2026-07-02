@@ -22,7 +22,8 @@ add_executable(
     src/radical_load_fallback.cpp
     src/radical_api.cpp
     src/radical_load_radicals.cpp
-    src/radical_load_fallback.cpp)
+    src/radical_load_fallback.cpp
+    include/mcc2lm/ngram.hpp)
 
 target_include_directories(mcc2lm PUBLIC include)
 
